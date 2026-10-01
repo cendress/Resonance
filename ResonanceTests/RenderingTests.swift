@@ -41,6 +41,47 @@ struct RenderingTests {
     }
 
     @Test
+    func idleBackgroundClearlyReorganizesAcrossTenSeconds() {
+        let model = MeshGradientModel()
+        let startPoints = model.points(at: 0, state: .idle)
+        let laterPoints = model.points(at: 10, state: .idle)
+        let startColors = model.colors(
+            palette: PaletteLibrary.violet,
+            at: 0,
+            state: .idle
+        )
+        let laterColors = model.colors(
+            palette: PaletteLibrary.violet,
+            at: 10,
+            state: .idle
+        )
+        let averagePointTravel = zip(startPoints, laterPoints).reduce(Float.zero) {
+            $0 + simd_length($1.0 - $1.1)
+        } / Float(startPoints.count)
+        let changedColorCount = zip(startColors, laterColors).filter { $0 != $1 }.count
+
+        #expect(averagePointTravel > 0.025)
+        #expect(changedColorCount >= 12)
+    }
+
+    @Test
+    func audioAmplifiesMeshTravelWithoutChangingItsClock() {
+        let model = MeshGradientModel()
+        let idleStart = model.points(at: 2, state: .idle)
+        let idleLater = model.points(at: 7, state: .idle)
+        let reactiveStart = model.points(at: 2, state: .audioReactivePreview)
+        let reactiveLater = model.points(at: 7, state: .audioReactivePreview)
+        let idleTravel = zip(idleStart, idleLater).reduce(Float.zero) {
+            $0 + simd_length($1.0 - $1.1)
+        }
+        let reactiveTravel = zip(reactiveStart, reactiveLater).reduce(Float.zero) {
+            $0 + simd_length($1.0 - $1.1)
+        }
+
+        #expect(reactiveTravel > idleTravel * 1.25)
+    }
+
+    @Test
     func sphereMotionStaysOrganicButRecognizablySpherical() {
         let geometry = IcosphereGeometry.visualizer
         let idleStart = geometry.vertices.enumerated().map {
@@ -63,7 +104,8 @@ struct RenderingTests {
         #expect((idle + reactive).allSatisfy {
             let radius = simd_length($0)
             return radius.isFinite
-                && (SphereMotion.minimumRadius...SphereMotion.maximumRadius).contains(radius)
+                && radius >= SphereMotion.minimumRadius - 0.0001
+                && radius <= SphereMotion.maximumRadius + 0.0001
         })
         #expect(zip(geometry.vertices, reactive).allSatisfy { pair in
             simd_length(simd_cross(pair.0, simd_normalize(pair.1))) < 0.0001
@@ -258,9 +300,9 @@ struct RenderingTests {
     func visualBassCompressionHasNoiseFloorAndStrongSignalHeadroom() {
         #expect(VisualBassMapper.response(0) == 0)
         #expect(VisualBassMapper.response(VisualBassMapper.noiseFloor) == 0)
-        #expect((0.10...0.25).contains(VisualBassMapper.response(0.05)))
-        #expect((0.45...0.60).contains(VisualBassMapper.response(0.20)))
-        #expect((0.85...0.95).contains(VisualBassMapper.response(0.70)))
+        #expect((0.20...0.30).contains(VisualBassMapper.response(0.05)))
+        #expect((0.60...0.70).contains(VisualBassMapper.response(0.20)))
+        #expect((0.90...0.97).contains(VisualBassMapper.response(0.70)))
         #expect(VisualBassMapper.response(1) == 1)
         #expect(VisualBassMapper.response(0.7) < VisualBassMapper.response(0.9))
     }

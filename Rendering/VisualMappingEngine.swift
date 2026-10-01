@@ -4,8 +4,8 @@ import Foundation
 /// ordinary bass without flattening strong hits against 1.0.
 struct VisualBassMapper {
     static let noiseFloor: Float = 0.04
-    static let gain: Float = 1.5
-    static let exponent: Float = 0.50
+    static let gain: Float = 2.0
+    static let exponent: Float = 0.38
 
     private var smoother = Smoother(attack: 0.78, release: 0.36)
     private(set) var lastRawBass: Float = 0

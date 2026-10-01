@@ -13,16 +13,16 @@ struct SphereMotionResponse: Equatable, Sendable {
 /// renderer state to the audio pipeline. The response is advanced once per
 /// rendered frame and then shared by every vertex in that frame.
 struct SphereSpringSystem: Sendable {
-    static let bassSpringStrength: Float = 52
-    static let bassDamping: Float = 5.2
-    static let bassVelocityImpulse: Float = 8.5
-    static let bassReleaseVelocityImpulse: Float = 2.5
-    static let bassTransientCoupling: Float = 2.2
-    static let sustainedBassTargetAmplitude: Float = 0.25
-    static let sustainedBassLevelExponent: Float = 1.35
-    static let sustainedBassAngularRate: Float = 7.2
-    static let bassDeltaDeadZone: Float = 0.018
-    static let bassDeltaExponent: Float = 0.75
+    static let bassSpringStrength: Float = 64
+    static let bassDamping: Float = 5.6
+    static let bassVelocityImpulse: Float = 10.5
+    static let bassReleaseVelocityImpulse: Float = 3.2
+    static let bassTransientCoupling: Float = 2.8
+    static let sustainedBassTargetAmplitude: Float = 0.30
+    static let sustainedBassLevelExponent: Float = 1.08
+    static let sustainedBassAngularRate: Float = 7.6
+    static let bassDeltaDeadZone: Float = 0.012
+    static let bassDeltaExponent: Float = 0.66
     static let lowMidSpringStrength: Float = 16
     static let lowMidDamping: Float = 5.4
     static let beatSpringStrength: Float = 38
@@ -115,7 +115,7 @@ private struct DampedSphereSpring: Sendable {
         }
 
         position = SphereMath.clamp(position, lowerBound: -1.15, upperBound: 1.15)
-        velocity = SphereMath.clamp(velocity, lowerBound: -8, upperBound: 8)
+        velocity = SphereMath.clamp(velocity, lowerBound: -12, upperBound: 12)
         return position
     }
 
@@ -132,8 +132,8 @@ enum SphereMotion {
     static let idleWaveStrength: Float = 0.012
     static let idleLobeStrength: Float = 0.009
     static let idlePeakStrength: Float = 0.010
-    static let bassPressureAmplitude: Float = 0.140
-    static let bassContractionAmplitude: Float = 0.220
+    static let bassPressureAmplitude: Float = 0.160
+    static let bassContractionAmplitude: Float = 0.235
     static let lowMidWaveStrength: Float = 0.105
     static let midDeformationStrength: Float = 0.075
     static let dynamicPeakStrength: Float = 0.115
@@ -141,8 +141,8 @@ enum SphereMotion {
     static let beatImpulseStrength: Float = 0.095
     static let beatPeakStrength: Float = 0.120
     static let beatWaveStrength: Float = 0.070
-    static let minimumRadius: Float = 0.90
-    static let maximumRadius: Float = 1.14
+    static let minimumRadius: Float = 0.88
+    static let maximumRadius: Float = 1.17
 
     static func perceptualResponse(_ value: Float) -> Float {
         pow(SphereMath.clamp(value), sensitivityExponent)
@@ -228,9 +228,12 @@ enum SphereMotion {
         // Rising bass pushes the whole membrane outward. The underdamped
         // pressure spring then crosses neutral, with a deliberately readable
         // inward stroke, before rebounding and settling.
+        let bassStrokeGain = 0.75
+            + (state.visualBass * 0.20)
+            + (state.energy * 0.35)
         let bassPumping = response.bass >= 0
-            ? response.bass * bassPressureAmplitude
-            : response.bass * bassContractionAmplitude
+            ? response.bass * bassPressureAmplitude * bassStrokeGain
+            : response.bass * bassContractionAmplitude * bassStrokeGain
 
         // Two low-frequency spatial fields create large waves traveling in
         // different directions rather than a single uniform wobble.

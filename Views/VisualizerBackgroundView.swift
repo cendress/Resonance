@@ -26,10 +26,11 @@ struct VisualizerBackgroundView: View {
                 at: elapsed,
                 state: renderedState
             )
-            let distortion = 5.0
-                + (Double(renderedState.mids) * 7.0)
-                + (Double(renderedState.energy) * 5.0)
-                + (Double(renderedState.beatPulse) * 2.0)
+            let distortion = 9.0
+                + (Double(renderedState.mids) * 5.0)
+                + (Double(renderedState.energy) * 9.0)
+                + (Double(renderedState.bass) * 5.0)
+                + (Double(renderedState.beatPulse) * 3.0)
 
             MeshGradient(
                 width: MeshGradientModel.width,
@@ -47,9 +48,10 @@ struct VisualizerBackgroundView: View {
                     .float(renderedState.energy),
                     .float(renderedState.bass),
                     .float(renderedState.mids),
-                    .float(renderedState.treble)
+                    .float(renderedState.treble),
+                    .float(renderedState.beatPulse)
                 ),
-                maxSampleOffset: CGSize(width: 24, height: 24)
+                maxSampleOffset: CGSize(width: 44, height: 44)
             )
             .overlay {
                 palette.nearBlack.color
