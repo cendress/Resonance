@@ -1,7 +1,8 @@
 import Foundation
 
-/// A lightweight attack/release exponential smoother for normalized signals.
-struct Smoother: Sendable {
+/// An attack/release exponential smoother.
+/// Attack controls rising values; release controls falling values.
+nonisolated struct Smoother: Equatable, Sendable {
     let attack: Float
     let release: Float
     private(set) var value: Float
@@ -21,8 +22,9 @@ struct Smoother: Sendable {
 
     @discardableResult
     mutating func update(with target: Float) -> Float {
-        let factor = target > value ? attack : release
-        value += (target - value) * factor
+        let safeTarget = target.isFinite ? target : 0
+        let factor = safeTarget > value ? attack : release
+        value += (safeTarget - value) * factor
         return value
     }
 
@@ -32,7 +34,7 @@ struct Smoother: Sendable {
     }
 
     mutating func reset(to newValue: Float = 0) {
-        value = newValue
+        value = newValue.isFinite ? newValue : 0
     }
 
     private static func clampedFactor(_ factor: Float) -> Float {
