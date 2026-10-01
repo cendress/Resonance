@@ -1,3 +1,4 @@
+import CoreGraphics
 import simd
 import Testing
 @testable import Resonance
@@ -38,6 +39,51 @@ struct RenderingTests {
             $0.x.isFinite && $0.y.isFinite
                 && (0...1).contains($0.x) && (0...1).contains($0.y)
         })
+    }
+
+    @Test
+    func maximumBackgroundWarpStaysInsideOverscanAndSamplingBudget() {
+        var maximumState = VisualizerState.idle
+        maximumState.mids = 1
+        maximumState.energy = 1
+        maximumState.bass = 1
+        maximumState.beatPulse = 1
+
+        let narrowestSupportedPhoneWidth: CGFloat = 375
+        let shortestSupportedPhoneHeight: CGFloat = 667
+        let horizontalBleed = narrowestSupportedPhoneWidth
+            * (VisualizerBackgroundView.overscanScale - 1)
+            / 2
+        let verticalBleed = shortestSupportedPhoneHeight
+            * (VisualizerBackgroundView.overscanScale - 1)
+            / 2
+
+        #expect(VisualizerBackgroundView.distortionAmplitude(for: maximumState) == 31)
+        #expect(horizontalBleed >= VisualizerBackgroundView.maximumHorizontalWarp)
+        #expect(verticalBleed >= VisualizerBackgroundView.maximumVerticalWarp)
+    }
+
+    @Test
+    func maximumAudioMotionKeepsMeshBoundaryClosed() {
+        let model = MeshGradientModel()
+        var maximumState = VisualizerState.audioReactivePreview
+        maximumState.bass = 1
+        maximumState.mids = 1
+        maximumState.energy = 1
+        maximumState.beatPulse = 1
+
+        for time: Float in [0, 7, 19, 41] {
+            let points = model.points(at: time, state: maximumState)
+
+            #expect((0..<MeshGradientModel.width).allSatisfy { points[$0].y == 0 })
+            #expect((12..<16).allSatisfy { points[$0].y == 1 })
+            #expect((0..<MeshGradientModel.height).allSatisfy {
+                points[$0 * MeshGradientModel.width].x == 0
+            })
+            #expect((0..<MeshGradientModel.height).allSatisfy {
+                points[($0 * MeshGradientModel.width) + 3].x == 1
+            })
+        }
     }
 
     @Test

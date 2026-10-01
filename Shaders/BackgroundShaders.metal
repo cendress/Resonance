@@ -12,7 +12,9 @@ using namespace metal;
     float bass,
     float mids,
     float treble,
-    float beat
+    float beat,
+    float2 sourceSize,
+    float2 maximumWarpOffset
 ) {
     float2 field = position * 0.0042;
     float verySlowTime = time * 0.075;
@@ -66,5 +68,16 @@ using namespace metal;
         * ((bass * 0.34) + (beat * 0.14));
     displacement += float2(shimmer, -shimmer * 0.68) * 0.052;
 
-    return position + (displacement * amplitude);
+    // Overscan is the primary edge protection. Bound only the unreachable
+    // extremes of the combined fields, then keep the final source coordinate
+    // inside the enlarged texture as a last-resort transparent-edge guard.
+    float2 warpOffset = clamp(
+        displacement * amplitude,
+        -maximumWarpOffset,
+        maximumWarpOffset
+    );
+    float2 warpedPosition = position + warpOffset;
+    float2 safeInset = float2(1.0);
+    float2 maximumSamplePosition = max(sourceSize - safeInset, safeInset);
+    return clamp(warpedPosition, safeInset, maximumSamplePosition);
 }
