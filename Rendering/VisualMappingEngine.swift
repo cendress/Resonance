@@ -49,11 +49,9 @@ struct VisualMappingEngine {
         )
 
         return VisualizerState(
-            sphereScale: 1
-                + (smoothed.subBass * 0.014)
-                + (smoothed.bass * 0.030)
-                + (smoothed.loudness * 0.008)
-                + (smoothed.beatPulse * 0.028),
+            // Major radial movement lives in SphereMotion's signed spring
+            // response so audio can contract below neutral as well as expand.
+            sphereScale: 1,
             surfaceDisplacement: min((lowFrequencyMotion * 0.72) + (detailedMotion * 0.28), 1),
             pulse: smoothed.beatPulse,
             rotationRate: SphereMotion.ambientRotationRate

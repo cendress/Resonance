@@ -62,7 +62,8 @@ struct RenderingTests {
         #expect(idle != reactive)
         #expect((idle + reactive).allSatisfy {
             let radius = simd_length($0)
-            return radius.isFinite && (0.90...1.14).contains(radius)
+            return radius.isFinite
+                && (SphereMotion.minimumRadius...SphereMotion.maximumRadius).contains(radius)
         })
         #expect(zip(geometry.vertices, reactive).allSatisfy { pair in
             simd_length(simd_cross(pair.0, simd_normalize(pair.1))) < 0.0001
@@ -115,14 +116,96 @@ struct RenderingTests {
         lowMidState.energy = 1
         lowMidState.surfaceDisplacement = 1
 
-        let idleRadii = radii(for: geometry, state: .idle, time: 1)
-        let bassRadii = radii(for: geometry, state: bassState, time: 1)
-        let lowMidRadii = radii(for: geometry, state: lowMidState, time: 1)
+        let idleRadii = radii(
+            for: geometry,
+            state: .idle,
+            time: 1,
+            response: .zero
+        )
+        let bassRadii = radii(
+            for: geometry,
+            state: bassState,
+            time: 1,
+            response: SphereMotionResponse(bass: 1)
+        )
+        let lowMidRadii = radii(
+            for: geometry,
+            state: lowMidState,
+            time: 1,
+            response: SphereMotionResponse(lowMids: 1)
+        )
         let idleMean = idleRadii.reduce(0, +) / Float(idleRadii.count)
         let bassMean = bassRadii.reduce(0, +) / Float(bassRadii.count)
 
         #expect(bassMean > idleMean + 0.02)
         #expect((lowMidRadii.max()! - lowMidRadii.min()!) > 0.06)
+    }
+
+    @Test
+    func energeticMotionExpandsAndContractsBelowNeutralRadius() {
+        let geometry = IcosphereGeometry.visualizer
+        var springSystem = SphereSpringSystem()
+        var energetic = VisualizerState.audioReactivePreview
+        energetic.subBass = 0.9
+        energetic.bass = 1
+        energetic.lowMids = 0.9
+        energetic.mids = 0.85
+        energetic.treble = 0.7
+        energetic.energy = 1
+        energetic.surfaceDisplacement = 1
+
+        var minimumRadius: Float = 1
+        var maximumRadius: Float = 1
+        for frame in 0..<240 {
+            energetic.beatPulse = frame == 0 ? 1 : 0
+            let time = Float(frame) / 60
+            let response = springSystem.update(
+                state: energetic,
+                time: time,
+                deltaTime: 1 / 60
+            )
+            let frameRadii = radii(
+                for: geometry,
+                state: energetic,
+                time: time,
+                response: response
+            )
+            minimumRadius = min(minimumRadius, frameRadii.min()!)
+            maximumRadius = max(maximumRadius, frameRadii.max()!)
+        }
+
+        #expect(minimumRadius < 0.95)
+        #expect(maximumRadius > 1.10)
+        #expect(minimumRadius >= SphereMotion.minimumRadius - 0.0001)
+        #expect(maximumRadius <= SphereMotion.maximumRadius + 0.0001)
+    }
+
+    @Test
+    func beatImpulseOvershootsContractsAndRebounds() {
+        var springSystem = SphereSpringSystem()
+        var state = VisualizerState.idle
+        var response: [Float] = []
+
+        for frame in 0..<240 {
+            state.beatPulse = frame == 0 ? 1 : 0
+            response.append(
+                springSystem.update(
+                    state: state,
+                    time: Float(frame) / 60,
+                    deltaTime: 1 / 60
+                ).beat
+            )
+        }
+
+        let peakIndex = response.indices.max { response[$0] < response[$1] }!
+        let contractionRange = response.index(after: peakIndex)..<response.endIndex
+        let contractionIndex = contractionRange.min { response[$0] < response[$1] }!
+        let reboundRange = response.index(after: contractionIndex)..<response.endIndex
+
+        #expect(response[peakIndex] > 0.50)
+        #expect(response[contractionIndex] < -0.05)
+        #expect(reboundRange.map { response[$0] }.max()! > 0.005)
+        #expect(abs(response.last!) < 0.001)
     }
 
     @Test
@@ -149,7 +232,8 @@ struct RenderingTests {
         #expect(state.bass > 0)
         #expect(state.energy > 0)
         #expect(state.beatPulse > 0)
-        #expect(state.sphereScale > 1)
+        #expect(state.sphereScale == 1)
+        #expect(state.surfaceDisplacement > 0)
         #expect(state.backgroundEnergy > 0)
     }
 
@@ -176,7 +260,8 @@ struct RenderingTests {
     private func radii(
         for geometry: IcosphereGeometry,
         state: VisualizerState,
-        time: Float
+        time: Float,
+        response: SphereMotionResponse
     ) -> [Float] {
         geometry.vertices.enumerated().map {
             simd_length(
@@ -184,7 +269,8 @@ struct RenderingTests {
                     $0.element,
                     index: $0.offset,
                     time: time,
-                    state: state
+                    state: state,
+                    response: response
                 )
             )
         }

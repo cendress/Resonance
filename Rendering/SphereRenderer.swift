@@ -10,6 +10,8 @@ final class SphereRenderer {
     private var projectedVertices: [ProjectedSpherePoint]
     private var faceDepths: [Float]
     private var faceOrder: [Int]
+    private var springSystem = SphereSpringSystem()
+    private var previousRenderTime: Float?
 
     init(geometry providedGeometry: IcosphereGeometry? = nil) {
         let geometry = providedGeometry ?? .visualizer
@@ -33,6 +35,19 @@ final class SphereRenderer {
         guard size.width > 0, size.height > 0 else { return }
 
         let orientation = SphereMotion.orientation(at: time, state: state)
+        let deltaTime: Float
+        if let previousRenderTime, time >= previousRenderTime {
+            deltaTime = time - previousRenderTime
+        } else {
+            springSystem.reset()
+            deltaTime = 1 / 60
+        }
+        previousRenderTime = time
+        let motionResponse = springSystem.update(
+            state: state,
+            time: time,
+            deltaTime: deltaTime
+        )
         let center = SIMD2<Float>(Float(size.width * 0.5), Float(size.height * 0.46))
         let screenRadius = Float(min(size.width, size.height)) * 0.335
         let overallScale = SphereMath.clamp(state.sphereScale, lowerBound: 0.86, upperBound: 1.24)
@@ -42,7 +57,8 @@ final class SphereRenderer {
                 geometry.vertices[index],
                 index: index,
                 time: time,
-                state: state
+                state: state,
+                response: motionResponse
             ) * overallScale
             let transformed = SphereMath.rotate(deformed, angles: orientation)
             transformedVertices[index] = transformed
