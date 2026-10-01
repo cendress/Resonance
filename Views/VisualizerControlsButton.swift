@@ -16,3 +16,13 @@ struct VisualizerControlsButton: View {
         .accessibilityHint("Opens visualizer controls")
     }
 }
+
+#Preview("Controls Button") {
+    @Previewable @State var isPresented = false
+
+    ZStack {
+        Color.black
+        VisualizerControlsButton(isPresented: $isPresented)
+    }
+    .preferredColorScheme(.dark)
+}

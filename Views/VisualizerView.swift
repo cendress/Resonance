@@ -26,3 +26,28 @@ struct VisualizerView: View {
         .preferredColorScheme(.dark)
     }
 }
+
+private struct VisualizerSurfacePreview: View {
+    let state: VisualizerState
+
+    var body: some View {
+        ZStack {
+            VisualizerBackgroundView(state: state)
+            SphereView(state: state)
+        }
+        .ignoresSafeArea()
+        .preferredColorScheme(.dark)
+    }
+}
+
+#Preview("Visualizer") {
+    VisualizerView(viewModel: VisualizerViewModel())
+}
+
+#Preview("Idle") {
+    VisualizerSurfacePreview(state: .idle)
+}
+
+#Preview("Audio Reactive") {
+    VisualizerSurfacePreview(state: .audioReactivePreview)
+}

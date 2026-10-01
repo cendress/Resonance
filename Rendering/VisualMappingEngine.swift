@@ -17,7 +17,7 @@ struct VisualMappingEngine {
     private var beatSmoother = Smoother(attack: 0.82, release: 0.13)
 
     private var musicCharacter = RollingMusicCharacter()
-    private let paletteSelector = PaletteSelector()
+    private var paletteSelector = PaletteSelector()
 
     mutating func map(_ metrics: AudioMetrics) -> VisualizerState {
         let smoothed = AudioMetrics(
@@ -62,6 +62,15 @@ struct VisualMappingEngine {
                     + (musicCharacter.rollingIntensity * 0.20),
                 1
             ),
+            subBass: smoothed.subBass,
+            bass: smoothed.bass,
+            lowMids: smoothed.lowMids,
+            mids: min((smoothed.mids * 0.72) + (smoothed.upperMids * 0.28), 1),
+            treble: min((smoothed.treble * 0.78) + (smoothed.upperMids * 0.22), 1),
+            energy: smoothed.energy,
+            loudness: smoothed.loudness,
+            brightness: smoothed.brightness,
+            beatPulse: smoothed.beatPulse,
             palette: paletteSelector.palette(for: musicCharacter)
         )
     }
@@ -78,6 +87,7 @@ struct VisualMappingEngine {
         brightnessSmoother.reset()
         beatSmoother.reset()
         musicCharacter.reset()
+        paletteSelector.reset()
         return .idle
     }
 }

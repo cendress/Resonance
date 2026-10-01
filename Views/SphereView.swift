@@ -1,25 +1,52 @@
 import SwiftUI
 
-/// A temporary SwiftUI stand-in for the future sphere renderer.
 struct SphereView: View {
     let state: VisualizerState
+    @State private var renderer = SphereRenderer()
+    @State private var paletteTransition: PaletteTransition
+    @State private var animationOrigin = Date()
+
+    init(state: VisualizerState) {
+        self.state = state
+        _paletteTransition = State(initialValue: PaletteTransition(palette: state.palette))
+    }
 
     var body: some View {
-        Circle()
-            .fill(
-                RadialGradient(
-                    colors: [state.palette.accent.color, state.palette.primary.color],
-                    center: .topLeading,
-                    startRadius: 4,
-                    endRadius: 180
+        TimelineView(.animation(minimumInterval: 1.0 / 60.0, paused: false)) { timeline in
+            let elapsed = Float(timeline.date.timeIntervalSince(animationOrigin))
+            let paletteTime = timeline.date.timeIntervalSinceReferenceDate
+            let palette = paletteTransition.value(at: paletteTime)
+
+            Canvas(
+                opaque: false,
+                colorMode: .extendedLinear,
+                rendersAsynchronously: false
+            ) { context, size in
+                renderer.render(
+                    into: &context,
+                    size: size,
+                    state: state,
+                    palette: palette,
+                    time: elapsed
                 )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .onChange(of: state.palette) { _, newPalette in
+            paletteTransition.retarget(
+                to: newPalette,
+                at: Date().timeIntervalSinceReferenceDate
             )
-            .frame(width: 220, height: 220)
-            .scaleEffect(CGFloat(state.sphereScale))
-            .shadow(
-                color: state.palette.accent.color.opacity(0.25),
-                radius: 32
-            )
-            .accessibilityHidden(true)
+        }
+        .accessibilityHidden(true)
     }
+}
+
+#Preview("Sphere") {
+    ZStack {
+        Color.black
+        SphereView(state: .audioReactivePreview)
+    }
+    .ignoresSafeArea()
+    .preferredColorScheme(.dark)
 }

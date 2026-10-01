@@ -80,3 +80,8 @@ struct ControlsSheet: View {
         }
     }
 }
+
+#Preview("Controls Sheet") {
+    ControlsSheet(viewModel: VisualizerViewModel())
+        .preferredColorScheme(.dark)
+}
