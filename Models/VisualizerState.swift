@@ -12,6 +12,7 @@ struct VisualizerState: Equatable, Sendable {
     /// Smoothed render inputs. Views never receive raw analyzer output.
     var subBass: Float
     var bass: Float
+    var visualBass: Float
     var lowMids: Float
     var mids: Float
     var treble: Float
@@ -30,6 +31,7 @@ struct VisualizerState: Equatable, Sendable {
         backgroundBrightness: 0.08,
         subBass: 0,
         bass: 0,
+        visualBass: 0,
         lowMids: 0,
         mids: 0,
         treble: 0,
@@ -49,6 +51,7 @@ struct VisualizerState: Equatable, Sendable {
         backgroundBrightness: 0.52,
         subBass: 0.55,
         bass: 0.72,
+        visualBass: 0.82,
         lowMids: 0.60,
         mids: 0.48,
         treble: 0.32,

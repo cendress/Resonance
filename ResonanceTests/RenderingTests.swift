@@ -110,6 +110,7 @@ struct RenderingTests {
         let geometry = IcosphereGeometry.visualizer
         var bassState = VisualizerState.idle
         bassState.bass = 1
+        bassState.visualBass = 1
         bassState.energy = 1
 
         var lowMidState = VisualizerState.idle
@@ -143,12 +144,46 @@ struct RenderingTests {
     }
 
     @Test
+    func bassPressureProducesImmediateWooferPushPullAndRebound() {
+        let geometry = IcosphereGeometry.visualizer
+        let medium = bassPumpingMeans(
+            geometry: geometry,
+            subBass: 0.35,
+            bass: 0.50,
+            energy: 0.50
+        )
+        let strong = bassPumpingMeans(
+            geometry: geometry,
+            subBass: 0.80,
+            bass: 0.90,
+            energy: 0.90
+        )
+
+        let mediumPeakIndex = medium.indices.max { medium[$0] < medium[$1] }!
+        let mediumContractionRange = medium.index(after: mediumPeakIndex)..<medium.endIndex
+        let mediumContractionIndex = mediumContractionRange.min {
+            medium[$0] < medium[$1]
+        }!
+        let mediumRebound = medium[medium.index(after: mediumContractionIndex)...].max()!
+
+        #expect(mediumPeakIndex < 20)
+        #expect(medium[mediumPeakIndex] > 1.04)
+        #expect(medium[mediumContractionIndex] < 0.99)
+        #expect(mediumRebound > medium[mediumContractionIndex] + 0.01)
+        #expect(strong.max()! > medium.max()! + 0.02)
+        #expect(strong.min()! < medium.min()! - 0.008)
+        #expect(strong.max()! > 1.075)
+        #expect(strong.min()! < 0.97)
+    }
+
+    @Test
     func energeticMotionExpandsAndContractsBelowNeutralRadius() {
         let geometry = IcosphereGeometry.visualizer
         var springSystem = SphereSpringSystem()
         var energetic = VisualizerState.audioReactivePreview
         energetic.subBass = 0.9
         energetic.bass = 1
+        energetic.visualBass = 1
         energetic.lowMids = 0.9
         energetic.mids = 0.85
         energetic.treble = 0.7
@@ -220,12 +255,46 @@ struct RenderingTests {
     }
 
     @Test
+    func visualBassCompressionHasNoiseFloorAndStrongSignalHeadroom() {
+        #expect(VisualBassMapper.response(0) == 0)
+        #expect(VisualBassMapper.response(VisualBassMapper.noiseFloor) == 0)
+        #expect((0.10...0.25).contains(VisualBassMapper.response(0.05)))
+        #expect((0.45...0.60).contains(VisualBassMapper.response(0.20)))
+        #expect((0.85...0.95).contains(VisualBassMapper.response(0.70)))
+        #expect(VisualBassMapper.response(1) == 1)
+        #expect(VisualBassMapper.response(0.7) < VisualBassMapper.response(0.9))
+    }
+
+    @Test
+    func sustainedBassContinuesPumpingAfterInitialImpulseSettles() {
+        var springSystem = SphereSpringSystem()
+        var state = VisualizerState.idle
+        state.visualBass = 0.78
+        var lateResponse: [Float] = []
+
+        for frame in 0..<180 {
+            let response = springSystem.update(
+                state: state,
+                time: Float(frame) / 60,
+                deltaTime: 1 / 60
+            )
+            if frame >= 90 {
+                lateResponse.append(response.bass)
+            }
+        }
+
+        #expect(lateResponse.max()! > 0.15)
+        #expect(lateResponse.min()! < -0.15)
+    }
+
+    @Test
     func moderateAudioCreatesVisiblePeaksValleysAndTriangleContrastWithinOneSecond() {
         let geometry = IcosphereGeometry.visualizer
         var springSystem = SphereSpringSystem()
         var state = VisualizerState.idle
         state.subBass = 0.42
         state.bass = 0.48
+        state.visualBass = VisualBassMapper.response((0.42 * 0.35) + (0.48 * 0.65))
         state.lowMids = 0.45
         state.mids = 0.50
         state.treble = 0.35
@@ -375,6 +444,38 @@ struct RenderingTests {
                 maximum,
                 max(firstEdge, max(secondEdge, thirdEdge))
             )
+        }
+    }
+
+    private func bassPumpingMeans(
+        geometry: IcosphereGeometry,
+        subBass: Float,
+        bass: Float,
+        energy: Float
+    ) -> [Float] {
+        var springSystem = SphereSpringSystem()
+        var state = VisualizerState.idle
+        state.subBass = subBass
+        state.bass = bass
+        state.visualBass = VisualBassMapper.response(
+            (subBass * 0.35) + (bass * 0.65)
+        )
+        state.energy = energy
+
+        return (0..<60).map { frame in
+            let time = Float(frame) / 60
+            let response = springSystem.update(
+                state: state,
+                time: time,
+                deltaTime: 1 / 60
+            )
+            let frameRadii = radii(
+                for: geometry,
+                state: state,
+                time: time,
+                response: response
+            )
+            return frameRadii.reduce(0, +) / Float(frameRadii.count)
         }
     }
 }

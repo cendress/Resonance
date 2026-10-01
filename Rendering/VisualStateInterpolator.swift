@@ -67,15 +67,22 @@ final class VisualStateInterpolator {
             current.subBass,
             target.subBass,
             deltaTime: deltaTime,
-            attack: 0.055,
-            release: 0.40
+            attack: 0.025,
+            release: 0.16
         )
         current.bass = follow(
             current.bass,
             target.bass,
             deltaTime: deltaTime,
-            attack: 0.055,
-            release: 0.40
+            attack: 0.025,
+            release: 0.16
+        )
+        current.visualBass = follow(
+            current.visualBass,
+            target.visualBass,
+            deltaTime: deltaTime,
+            attack: 0.018,
+            release: 0.075
         )
         current.lowMids = follow(
             current.lowMids,

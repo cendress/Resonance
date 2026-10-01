@@ -13,8 +13,16 @@ struct SphereMotionResponse: Equatable, Sendable {
 /// renderer state to the audio pipeline. The response is advanced once per
 /// rendered frame and then shared by every vertex in that frame.
 struct SphereSpringSystem: Sendable {
-    static let bassSpringStrength: Float = 22
-    static let bassDamping: Float = 6.6
+    static let bassSpringStrength: Float = 52
+    static let bassDamping: Float = 5.2
+    static let bassVelocityImpulse: Float = 8.5
+    static let bassReleaseVelocityImpulse: Float = 2.5
+    static let bassTransientCoupling: Float = 2.2
+    static let sustainedBassTargetAmplitude: Float = 0.25
+    static let sustainedBassLevelExponent: Float = 1.35
+    static let sustainedBassAngularRate: Float = 7.2
+    static let bassDeltaDeadZone: Float = 0.018
+    static let bassDeltaExponent: Float = 0.75
     static let lowMidSpringStrength: Float = 16
     static let lowMidDamping: Float = 5.4
     static let beatSpringStrength: Float = 38
@@ -33,6 +41,7 @@ struct SphereSpringSystem: Sendable {
         strength: beatSpringStrength,
         damping: beatDamping
     )
+    private var previousBassEnvelope: Float = 0
     private var previousBeatPulse: Float = 0
 
     mutating func update(
@@ -40,18 +49,31 @@ struct SphereSpringSystem: Sendable {
         time: Float,
         deltaTime: Float
     ) -> SphereMotionResponse {
-        let subBass = SphereMotion.perceptualResponse(state.subBass)
-        let bass = SphereMotion.perceptualResponse(state.bass)
+        let visualBass = SphereMath.clamp(state.visualBass)
         let lowMids = SphereMotion.perceptualResponse(state.lowMids)
         let beatPulse = SphereMotion.perceptualResponse(state.beatPulse)
-        let bassEnvelope = (subBass * 0.35) + (bass * 0.65)
-        let bassTarget = bassEnvelope * sin((time * 2.0) - 0.35)
+        let bassEnvelope = visualBass
+        let bassTarget = pow(bassEnvelope, Self.sustainedBassLevelExponent)
+            * Self.sustainedBassTargetAmplitude
+            * sin(time * Self.sustainedBassAngularRate)
         let lowMidTarget = lowMids * sin((time * 1.24) + 0.55)
+        let bassDelta = bassEnvelope - previousBassEnvelope
+        let bassDeltaMagnitude = max(abs(bassDelta) - Self.bassDeltaDeadZone, 0)
+        let responsiveBassDelta = pow(bassDeltaMagnitude, Self.bassDeltaExponent)
+            * (bassDelta < 0 ? -1 : 1)
         let beatRise = max(beatPulse - previousBeatPulse, 0)
+        let bassVelocityImpulse = (max(responsiveBassDelta, 0) * Self.bassVelocityImpulse)
+            + (min(responsiveBassDelta, 0) * Self.bassReleaseVelocityImpulse)
+            + (beatRise * bassEnvelope * Self.bassTransientCoupling)
+        previousBassEnvelope = bassEnvelope
         previousBeatPulse = beatPulse
 
         return SphereMotionResponse(
-            bass: bassSpring.update(target: bassTarget, deltaTime: deltaTime),
+            bass: bassSpring.update(
+                target: bassTarget,
+                deltaTime: deltaTime,
+                velocityImpulse: bassVelocityImpulse
+            ),
             lowMids: lowMidSpring.update(target: lowMidTarget, deltaTime: deltaTime),
             beat: beatSpring.update(
                 target: 0,
@@ -65,6 +87,7 @@ struct SphereSpringSystem: Sendable {
         bassSpring.reset()
         lowMidSpring.reset()
         beatSpring.reset()
+        previousBassEnvelope = 0
         previousBeatPulse = 0
     }
 }
@@ -109,7 +132,8 @@ enum SphereMotion {
     static let idleWaveStrength: Float = 0.012
     static let idleLobeStrength: Float = 0.009
     static let idlePeakStrength: Float = 0.010
-    static let bassBreathingStrength: Float = 0.095
+    static let bassPressureAmplitude: Float = 0.140
+    static let bassContractionAmplitude: Float = 0.220
     static let lowMidWaveStrength: Float = 0.105
     static let midDeformationStrength: Float = 0.075
     static let dynamicPeakStrength: Float = 0.115
@@ -201,9 +225,12 @@ enum SphereMotion {
         )
         let idlePeaks = dynamicPeakField * idlePeakStrength
 
-        // The signed spring position makes the whole sphere inhale, overshoot,
-        // contract below neutral, and rebound instead of only scaling outward.
-        let bassBreathing = response.bass * bassBreathingStrength
+        // Rising bass pushes the whole membrane outward. The underdamped
+        // pressure spring then crosses neutral, with a deliberately readable
+        // inward stroke, before rebounding and settling.
+        let bassPumping = response.bass >= 0
+            ? response.bass * bassPressureAmplitude
+            : response.bass * bassContractionAmplitude
 
         // Two low-frequency spatial fields create large waves traveling in
         // different directions rather than a single uniform wobble.
@@ -314,7 +341,7 @@ enum SphereMotion {
             + idleTravelingWave
             + idleMigratingLobe
             + idlePeaks
-            + bassBreathing
+            + bassPumping
             + lowMidWaves
             + localizedMids
             + dynamicPeaks
