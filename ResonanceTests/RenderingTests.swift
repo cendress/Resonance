@@ -43,6 +43,9 @@ struct RenderingTests {
     @Test
     func sphereMotionStaysOrganicButRecognizablySpherical() {
         let geometry = IcosphereGeometry.visualizer
+        let idleStart = geometry.vertices.enumerated().map {
+            SphereMotion.deformedVertex($0.element, index: $0.offset, time: 0, state: .idle)
+        }
         let idle = geometry.vertices.enumerated().map {
             SphereMotion.deformedVertex($0.element, index: $0.offset, time: 2, state: .idle)
         }
@@ -55,11 +58,71 @@ struct RenderingTests {
             )
         }
 
+        #expect(idleStart != idle)
         #expect(idle != reactive)
         #expect((idle + reactive).allSatisfy {
             let radius = simd_length($0)
-            return radius.isFinite && (0.88...1.16).contains(radius)
+            return radius.isFinite && (0.90...1.14).contains(radius)
         })
+        #expect(zip(geometry.vertices, reactive).allSatisfy { pair in
+            simd_length(simd_cross(pair.0, simd_normalize(pair.1))) < 0.0001
+        })
+    }
+
+    @Test
+    func rotationRemainsAmbientUnderEnergeticAudio() {
+        var quietEngine = VisualMappingEngine()
+        var energeticEngine = VisualMappingEngine()
+        let quietMetrics = AudioMetrics(loudness: 0.08, energy: 0.08)
+        let energeticMetrics = AudioMetrics(
+            subBass: 0.8,
+            bass: 0.9,
+            lowMids: 0.8,
+            mids: 0.7,
+            treble: 0.6,
+            loudness: 0.9,
+            energy: 1,
+            beatPulse: 1
+        )
+
+        var quiet = VisualizerState.idle
+        var energetic = VisualizerState.idle
+        for _ in 0..<120 {
+            quiet = quietEngine.map(quietMetrics)
+            energetic = energeticEngine.map(energeticMetrics)
+        }
+
+        let slowestRate = (2 * Float.pi) / 60
+        let fastestRate = (2 * Float.pi) / 30
+        #expect((slowestRate...fastestRate).contains(quiet.rotationRate))
+        #expect((slowestRate...fastestRate).contains(energetic.rotationRate))
+        #expect(abs(energetic.rotationRate - quiet.rotationRate) < 0.0031)
+
+        let oneAmbientTurn = SphereMotion.orientation(at: 48, state: .idle).y
+            - SphereMotion.orientation(at: 0, state: .idle).y
+        #expect(abs(oneAmbientTurn - (2 * Float.pi)) < 0.001)
+    }
+
+    @Test
+    func bassBreathesBroadlyAndLowMidsCreateTravelingWaves() {
+        let geometry = IcosphereGeometry.visualizer
+        var bassState = VisualizerState.idle
+        bassState.bass = 1
+        bassState.energy = 1
+
+        var lowMidState = VisualizerState.idle
+        lowMidState.lowMids = 1
+        lowMidState.energy = 1
+        lowMidState.surfaceDisplacement = 1
+
+        let idleRadii = radii(for: geometry, state: .idle, time: 1)
+        let bassRadii = radii(for: geometry, state: bassState, time: 1)
+        let lowMidRadii = radii(for: geometry, state: lowMidState, time: 1)
+        let idleMean = idleRadii.reduce(0, +) / Float(idleRadii.count)
+        let bassMean = bassRadii.reduce(0, +) / Float(bassRadii.count)
+
+        #expect(bassMean > idleMean + 0.02)
+        #expect((lowMidRadii.max()! - lowMidRadii.min()!) > 0.06)
     }
 
     @Test
@@ -108,5 +171,22 @@ struct RenderingTests {
         #expect(waking.energy < VisualizerState.audioReactivePreview.energy)
         #expect(settling.energy > 0)
         #expect(settling.energy < waking.energy)
+    }
+
+    private func radii(
+        for geometry: IcosphereGeometry,
+        state: VisualizerState,
+        time: Float
+    ) -> [Float] {
+        geometry.vertices.enumerated().map {
+            simd_length(
+                SphereMotion.deformedVertex(
+                    $0.element,
+                    index: $0.offset,
+                    time: time,
+                    state: state
+                )
+            )
+        }
     }
 }

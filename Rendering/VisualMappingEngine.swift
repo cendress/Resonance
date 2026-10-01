@@ -49,12 +49,15 @@ struct VisualMappingEngine {
         )
 
         return VisualizerState(
-            sphereScale: 1 + (smoothed.loudness * 0.13) + (smoothed.beatPulse * 0.10),
+            sphereScale: 1
+                + (smoothed.subBass * 0.014)
+                + (smoothed.bass * 0.030)
+                + (smoothed.loudness * 0.008)
+                + (smoothed.beatPulse * 0.028),
             surfaceDisplacement: min((lowFrequencyMotion * 0.72) + (detailedMotion * 0.28), 1),
             pulse: smoothed.beatPulse,
-            rotationRate: 0.04
-                + (musicCharacter.rollingRhythmicActivity * 0.34)
-                + (musicCharacter.rollingIntensity * 0.17),
+            rotationRate: SphereMotion.ambientRotationRate
+                + (musicCharacter.rollingRhythmicActivity * 0.003),
             backgroundEnergy: musicCharacter.rollingEnergy,
             backgroundBrightness: min(
                 0.06

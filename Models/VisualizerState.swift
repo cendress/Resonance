@@ -25,7 +25,7 @@ struct VisualizerState: Equatable, Sendable {
         sphereScale: 1,
         surfaceDisplacement: 0,
         pulse: 0,
-        rotationRate: 0,
+        rotationRate: (2 * Float.pi) / 48,
         backgroundEnergy: 0,
         backgroundBrightness: 0.08,
         subBass: 0,
@@ -41,10 +41,10 @@ struct VisualizerState: Equatable, Sendable {
     )
 
     static let audioReactivePreview = VisualizerState(
-        sphereScale: 1.10,
+        sphereScale: 1.07,
         surfaceDisplacement: 0.52,
         pulse: 0.64,
-        rotationRate: 0.25,
+        rotationRate: ((2 * Float.pi) / 48) + 0.002,
         backgroundEnergy: 0.58,
         backgroundBrightness: 0.52,
         subBass: 0.55,
