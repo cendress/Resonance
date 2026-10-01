@@ -5,25 +5,44 @@ struct VisualizerView: View {
 
     var body: some View {
         ZStack {
-            VisualizerBackgroundView(state: viewModel.visualizerState)
-                .ignoresSafeArea()
-
-            SphereView(state: viewModel.visualizerState)
+            VisualizerSurface(viewModel: viewModel)
 
             VStack {
                 Spacer()
 
-                VisualizerControlsButton(
-                    isPresented: $viewModel.isControlsPresented
-                )
-                .padding(.bottom, 24)
+                HStack {
+                    Spacer()
+
+                    VisualizerControlsButton(
+                        isPresented: $viewModel.isControlsPresented
+                    )
+                }
             }
+            .padding(20)
         }
         .sheet(isPresented: $viewModel.isControlsPresented) {
             ControlsSheet(viewModel: viewModel)
-                .presentationDetents([.medium])
+                .presentationDetents([
+                    .height(viewModel.hasImportedAudio ? 390 : 310)
+                ])
+                .presentationDragIndicator(.visible)
+                .presentationCornerRadius(34)
+                .presentationBackground(.ultraThinMaterial)
         }
         .preferredColorScheme(.dark)
+    }
+}
+
+private struct VisualizerSurface: View {
+    @Bindable var viewModel: VisualizerViewModel
+
+    var body: some View {
+        ZStack {
+            VisualizerBackgroundView(state: viewModel.visualizerState)
+                .ignoresSafeArea()
+
+            SphereView(state: viewModel.visualizerState)
+        }
     }
 }
 

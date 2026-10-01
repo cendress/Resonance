@@ -50,11 +50,25 @@ final class VisualizerViewModel {
 
             importedFileName = url.lastPathComponent
             songTitle = audioPipeline.displayTitle
-            isPlaying = false
             latestMetrics = .silence
-            visualizerState = mappingEngine.reset()
+            _ = mappingEngine.reset()
+
+            do {
+                try audioPipeline.play()
+                isPlaying = true
+            } catch {
+                isPlaying = false
+                errorMessage = error.localizedDescription
+                settleTowardIdle(preservingPalette: true)
+            }
         } catch {
             errorMessage = error.localizedDescription
+            if !audioPipeline.isLoaded {
+                importedFileName = nil
+                songTitle = nil
+                isPlaying = false
+                settleTowardIdle(preservingPalette: false)
+            }
         }
 
         isLoading = false
@@ -80,14 +94,14 @@ final class VisualizerViewModel {
         audioPipeline.pause()
         isPlaying = false
         latestMetrics = .silence
-        visualizerState = mappingEngine.reset()
+        settleTowardIdle(preservingPalette: true)
     }
 
     func stop() {
         audioPipeline.stop()
         isPlaying = false
         latestMetrics = .silence
-        visualizerState = mappingEngine.reset()
+        settleTowardIdle(preservingPalette: true)
     }
 
     func removeSong() {
@@ -96,7 +110,8 @@ final class VisualizerViewModel {
         songTitle = nil
         isPlaying = false
         latestMetrics = .silence
-        visualizerState = mappingEngine.reset()
+        _ = mappingEngine.reset()
+        settleTowardIdle(preservingPalette: false)
     }
 
     func clearError() {
@@ -108,6 +123,7 @@ final class VisualizerViewModel {
     }
 
     func receive(_ metrics: AudioMetrics) {
+        guard isPlaying else { return }
         latestMetrics = metrics
         visualizerState = mappingEngine.map(metrics)
     }
@@ -121,7 +137,15 @@ final class VisualizerViewModel {
             guard let self else { return }
             isPlaying = false
             latestMetrics = .silence
-            visualizerState = mappingEngine.reset()
+            settleTowardIdle(preservingPalette: true)
         }
+    }
+
+    private func settleTowardIdle(preservingPalette: Bool) {
+        var calmState = VisualizerState.idle
+        if preservingPalette {
+            calmState.palette = visualizerState.palette
+        }
+        visualizerState = calmState
     }
 }

@@ -89,4 +89,24 @@ struct RenderingTests {
         #expect(state.sphereScale > 1)
         #expect(state.backgroundEnergy > 0)
     }
+
+    @Test
+    func displayInterpolationWakesAndSettlesWithoutJumping() {
+        let interpolator = VisualStateInterpolator(initialValue: .idle)
+        _ = interpolator.value(toward: .idle, at: 0)
+
+        let waking = interpolator.value(
+            toward: .audioReactivePreview,
+            at: 1.0 / 60.0
+        )
+        let settling = interpolator.value(
+            toward: .idle,
+            at: 2.0 / 60.0
+        )
+
+        #expect(waking.energy > 0)
+        #expect(waking.energy < VisualizerState.audioReactivePreview.energy)
+        #expect(settling.energy > 0)
+        #expect(settling.energy < waking.energy)
+    }
 }

@@ -7,12 +7,27 @@ struct VisualizerControlsButton: View {
         Button {
             isPresented = true
         } label: {
-            Label("Controls", systemImage: "slider.horizontal.3")
-                .font(.headline)
-                .padding(.horizontal, 18)
-                .padding(.vertical, 12)
+            Image(systemName: "slider.horizontal.3")
+                .font(.system(size: 15, weight: .medium))
+                .frame(width: 44, height: 44)
+                .contentShape(.circle)
         }
-        .buttonStyle(.borderedProminent)
+        .buttonStyle(
+            .glass(
+                .clear
+                    .tint(.white.opacity(0.06))
+                    .interactive()
+            )
+        )
+        .buttonBorderShape(.circle)
+        .tint(.white.opacity(0.88))
+        .overlay {
+            Circle()
+                .stroke(.white.opacity(0.14), lineWidth: 0.5)
+                .allowsHitTesting(false)
+        }
+        .shadow(color: .black.opacity(0.16), radius: 5, y: 3)
+        .accessibilityLabel("Controls")
         .accessibilityHint("Opens visualizer controls")
     }
 }
