@@ -54,8 +54,7 @@ struct VisualMappingEngine {
             sphereScale: 1,
             surfaceDisplacement: min((lowFrequencyMotion * 0.72) + (detailedMotion * 0.28), 1),
             pulse: smoothed.beatPulse,
-            rotationRate: SphereMotion.ambientRotationRate
-                + (musicCharacter.rollingRhythmicActivity * 0.003),
+            rotationRate: SphereMotion.ambientRotationRate,
             backgroundEnergy: musicCharacter.rollingEnergy,
             backgroundBrightness: min(
                 0.06

@@ -97,7 +97,8 @@ struct RenderingTests {
         let fastestRate = (2 * Float.pi) / 30
         #expect((slowestRate...fastestRate).contains(quiet.rotationRate))
         #expect((slowestRate...fastestRate).contains(energetic.rotationRate))
-        #expect(abs(energetic.rotationRate - quiet.rotationRate) < 0.0031)
+        #expect(energetic.rotationRate == quiet.rotationRate)
+        #expect(energetic.rotationRate == SphereMotion.ambientRotationRate)
 
         let oneAmbientTurn = SphereMotion.orientation(at: 48, state: .idle).y
             - SphereMotion.orientation(at: 0, state: .idle).y
@@ -209,6 +210,89 @@ struct RenderingTests {
     }
 
     @Test
+    func perceptualCurveLiftsModerateAudioWithoutExceedingBounds() {
+        let moderate = SphereMotion.perceptualResponse(0.4)
+
+        #expect(moderate > 0.55)
+        #expect(moderate < 1)
+        #expect(SphereMotion.perceptualResponse(0) == 0)
+        #expect(SphereMotion.perceptualResponse(1) == 1)
+    }
+
+    @Test
+    func moderateAudioCreatesVisiblePeaksValleysAndTriangleContrastWithinOneSecond() {
+        let geometry = IcosphereGeometry.visualizer
+        var springSystem = SphereSpringSystem()
+        var state = VisualizerState.idle
+        state.subBass = 0.42
+        state.bass = 0.48
+        state.lowMids = 0.45
+        state.mids = 0.50
+        state.treble = 0.35
+        state.energy = 0.50
+        state.surfaceDisplacement = 0.50
+
+        var minimumRadius: Float = 1
+        var maximumRadius: Float = 1
+        var maximumNeighborContrast: Float = 0
+        var foundSimultaneousPeakAndValley = false
+
+        for frame in 0..<60 {
+            state.beatPulse = frame == 0 ? 0.70 : 0
+            let time = Float(frame) / 60
+            let response = springSystem.update(
+                state: state,
+                time: time,
+                deltaTime: 1 / 60
+            )
+            let frameRadii = radii(
+                for: geometry,
+                state: state,
+                time: time,
+                response: response
+            )
+            let frameMinimum = frameRadii.min()!
+            let frameMaximum = frameRadii.max()!
+            minimumRadius = min(minimumRadius, frameMinimum)
+            maximumRadius = max(maximumRadius, frameMaximum)
+            maximumNeighborContrast = max(
+                maximumNeighborContrast,
+                maximumEdgeContrast(radii: frameRadii, geometry: geometry)
+            )
+            foundSimultaneousPeakAndValley = foundSimultaneousPeakAndValley
+                || (frameMinimum < 0.97 && frameMaximum > 1.07)
+        }
+
+        #expect(minimumRadius < 0.96)
+        #expect(maximumRadius > 1.09)
+        #expect(maximumNeighborContrast > 0.045)
+        #expect(foundSimultaneousPeakAndValley)
+    }
+
+    @Test
+    func idleMotionChangesTriangleProportionsOverThreeSeconds() {
+        let geometry = IcosphereGeometry.visualizer
+        let start = radii(
+            for: geometry,
+            state: .idle,
+            time: 0,
+            response: .zero
+        )
+        let later = radii(
+            for: geometry,
+            state: .idle,
+            time: 3,
+            response: .zero
+        )
+        let averageChange = zip(start, later).reduce(Float.zero) {
+            $0 + abs($1.0 - $1.1)
+        } / Float(start.count)
+
+        #expect(averageChange > 0.008)
+        #expect(maximumEdgeContrast(radii: later, geometry: geometry) > 0.01)
+    }
+
+    @Test
     func mappingProducesSmoothedAudioReactiveState() {
         var engine = VisualMappingEngine()
         let metrics = AudioMetrics(
@@ -272,6 +356,24 @@ struct RenderingTests {
                     state: state,
                     response: response
                 )
+            )
+        }
+    }
+
+    private func maximumEdgeContrast(
+        radii: [Float],
+        geometry: IcosphereGeometry
+    ) -> Float {
+        geometry.faces.reduce(Float.zero) { maximum, face in
+            let first = Int(face.a)
+            let second = Int(face.b)
+            let third = Int(face.c)
+            let firstEdge = abs(radii[first] - radii[second])
+            let secondEdge = abs(radii[second] - radii[third])
+            let thirdEdge = abs(radii[third] - radii[first])
+            return max(
+                maximum,
+                max(firstEdge, max(secondEdge, thirdEdge))
             )
         }
     }

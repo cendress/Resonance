@@ -31,14 +31,16 @@ final class VisualStateInterpolator {
         current.surfaceDisplacement = follow(
             current.surfaceDisplacement,
             target.surfaceDisplacement,
-            deltaTime: deltaTime
+            deltaTime: deltaTime,
+            attack: 0.065,
+            release: 0.40
         )
         current.pulse = follow(
             current.pulse,
             target.pulse,
             deltaTime: deltaTime,
-            attack: 0.045,
-            release: 0.25
+            attack: 0.018,
+            release: 0.20
         )
         current.rotationRate = follow(
             current.rotationRate,
@@ -61,19 +63,55 @@ final class VisualStateInterpolator {
             attack: 0.30,
             release: 1.20
         )
-        current.subBass = follow(current.subBass, target.subBass, deltaTime: deltaTime)
-        current.bass = follow(current.bass, target.bass, deltaTime: deltaTime)
-        current.lowMids = follow(current.lowMids, target.lowMids, deltaTime: deltaTime)
-        current.mids = follow(current.mids, target.mids, deltaTime: deltaTime)
+        current.subBass = follow(
+            current.subBass,
+            target.subBass,
+            deltaTime: deltaTime,
+            attack: 0.055,
+            release: 0.40
+        )
+        current.bass = follow(
+            current.bass,
+            target.bass,
+            deltaTime: deltaTime,
+            attack: 0.055,
+            release: 0.40
+        )
+        current.lowMids = follow(
+            current.lowMids,
+            target.lowMids,
+            deltaTime: deltaTime,
+            attack: 0.055,
+            release: 0.40
+        )
+        current.mids = follow(
+            current.mids,
+            target.mids,
+            deltaTime: deltaTime,
+            attack: 0.050,
+            release: 0.38
+        )
         current.treble = follow(
             current.treble,
             target.treble,
             deltaTime: deltaTime,
-            attack: 0.07,
-            release: 0.30
+            attack: 0.035,
+            release: 0.24
         )
-        current.energy = follow(current.energy, target.energy, deltaTime: deltaTime)
-        current.loudness = follow(current.loudness, target.loudness, deltaTime: deltaTime)
+        current.energy = follow(
+            current.energy,
+            target.energy,
+            deltaTime: deltaTime,
+            attack: 0.055,
+            release: 0.40
+        )
+        current.loudness = follow(
+            current.loudness,
+            target.loudness,
+            deltaTime: deltaTime,
+            attack: 0.055,
+            release: 0.40
+        )
         current.brightness = follow(
             current.brightness,
             target.brightness,
@@ -85,8 +123,8 @@ final class VisualStateInterpolator {
             current.beatPulse,
             target.beatPulse,
             deltaTime: deltaTime,
-            attack: 0.045,
-            release: 0.25
+            attack: 0.018,
+            release: 0.20
         )
         current.palette = target.palette
         return current

@@ -44,7 +44,7 @@ struct VisualizerState: Equatable, Sendable {
         sphereScale: 1,
         surfaceDisplacement: 0.52,
         pulse: 0.64,
-        rotationRate: ((2 * Float.pi) / 48) + 0.002,
+        rotationRate: (2 * Float.pi) / 48,
         backgroundEnergy: 0.58,
         backgroundBrightness: 0.52,
         subBass: 0.55,

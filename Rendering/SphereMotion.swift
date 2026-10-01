@@ -17,9 +17,9 @@ struct SphereSpringSystem: Sendable {
     static let bassDamping: Float = 6.6
     static let lowMidSpringStrength: Float = 16
     static let lowMidDamping: Float = 5.4
-    static let beatSpringStrength: Float = 30
-    static let beatDamping: Float = 5.6
-    static let beatVelocityImpulse: Float = 6.5
+    static let beatSpringStrength: Float = 38
+    static let beatDamping: Float = 6.6
+    static let beatVelocityImpulse: Float = 8
 
     private var bassSpring = DampedSphereSpring(
         strength: bassSpringStrength,
@@ -40,11 +40,15 @@ struct SphereSpringSystem: Sendable {
         time: Float,
         deltaTime: Float
     ) -> SphereMotionResponse {
-        let bassEnvelope = (state.subBass * 0.35) + (state.bass * 0.65)
+        let subBass = SphereMotion.perceptualResponse(state.subBass)
+        let bass = SphereMotion.perceptualResponse(state.bass)
+        let lowMids = SphereMotion.perceptualResponse(state.lowMids)
+        let beatPulse = SphereMotion.perceptualResponse(state.beatPulse)
+        let bassEnvelope = (subBass * 0.35) + (bass * 0.65)
         let bassTarget = bassEnvelope * sin((time * 2.0) - 0.35)
-        let lowMidTarget = state.lowMids * sin((time * 1.24) + 0.55)
-        let beatRise = max(state.beatPulse - previousBeatPulse, 0)
-        previousBeatPulse = state.beatPulse
+        let lowMidTarget = lowMids * sin((time * 1.24) + 0.55)
+        let beatRise = max(beatPulse - previousBeatPulse, 0)
+        previousBeatPulse = beatPulse
 
         return SphereMotionResponse(
             bass: bassSpring.update(target: bassTarget, deltaTime: deltaTime),
@@ -100,16 +104,25 @@ private struct DampedSphereSpring: Sendable {
 
 enum SphereMotion {
     static let ambientRotationRate = (2 * Float.pi) / 48
-    static let idleBreathingStrength: Float = 0.014
-    static let idleWaveStrength: Float = 0.009
-    static let idleLobeStrength: Float = 0.006
-    static let bassBreathingStrength: Float = 0.085
-    static let lowMidWaveStrength: Float = 0.090
-    static let midDeformationStrength: Float = 0.060
-    static let trebleDetailStrength: Float = 0.0075
-    static let beatImpulseStrength: Float = 0.090
+    static let sensitivityExponent: Float = 0.62
+    static let idleBreathingStrength: Float = 0.016
+    static let idleWaveStrength: Float = 0.012
+    static let idleLobeStrength: Float = 0.009
+    static let idlePeakStrength: Float = 0.010
+    static let bassBreathingStrength: Float = 0.095
+    static let lowMidWaveStrength: Float = 0.105
+    static let midDeformationStrength: Float = 0.075
+    static let dynamicPeakStrength: Float = 0.115
+    static let trebleDetailStrength: Float = 0.011
+    static let beatImpulseStrength: Float = 0.095
+    static let beatPeakStrength: Float = 0.120
+    static let beatWaveStrength: Float = 0.070
     static let minimumRadius: Float = 0.90
     static let maximumRadius: Float = 1.14
+
+    static func perceptualResponse(_ value: Float) -> Float {
+        pow(SphereMath.clamp(value), sensitivityExponent)
+    }
 
     static func orientation(at time: Float, state: VisualizerState) -> SIMD3<Float> {
         let rotationRate = SphereMath.clamp(
@@ -143,6 +156,50 @@ enum SphereMotion {
                 + cos((base.z * 2.0) - (base.y * 1.5) + (time * 0.37))
         ) * 0.5 * idleWaveStrength
         let idleMigratingLobe = ambient * idleLobeStrength
+
+        // Compact cores surrounded by negative shoulders give adjacent vertices
+        // visibly different radii while remaining continuous across the surface.
+        let firstPeakCenter = SphereMath.normalize(
+            SIMD3<Float>(
+                sin((time * 0.23) + 0.4),
+                cos((time * 0.17) + 1.1),
+                sin((time * 0.19) + 2.4)
+            )
+        )
+        let secondPeakCenter = SphereMath.normalize(
+            SIMD3<Float>(
+                cos((time * 0.15) + 2.0),
+                sin((time * 0.27) + 3.2),
+                cos((time * 0.20) + 0.8)
+            )
+        )
+        let thirdPeakCenter = SphereMath.normalize(
+            SIMD3<Float>(
+                sin((time * 0.18) + 4.5),
+                cos((time * 0.24) + 2.7),
+                cos((time * 0.13) + 5.1)
+            )
+        )
+        let fourthPeakCenter = SphereMath.normalize(
+            SIMD3<Float>(
+                cos((time * 0.21) + 5.5),
+                sin((time * 0.16) + 0.9),
+                sin((time * 0.25) + 3.8)
+            )
+        )
+        let dynamicPeakField = SphereMath.clamp(
+            peakValleyField(base, center: firstPeakCenter)
+                * (0.72 + (sin((time * 0.71) + 0.3) * 0.24))
+                + peakValleyField(base, center: secondPeakCenter)
+                * (0.58 + (cos((time * 0.63) + 1.7) * 0.22))
+                - peakValleyField(base, center: thirdPeakCenter)
+                * (0.50 + (sin((time * 0.77) + 2.8) * 0.20))
+                + peakValleyField(base, center: fourthPeakCenter)
+                * (0.42 + (cos((time * 0.69) + 4.2) * 0.18)),
+            lowerBound: -1.35,
+            upperBound: 1.35
+        )
+        let idlePeaks = dynamicPeakField * idlePeakStrength
 
         // The signed spring position makes the whole sphere inhale, overshoot,
         // contract below neutral, and rebound instead of only scaling outward.
@@ -201,38 +258,70 @@ enum SphereMotion {
                 ) * 0.18
             )
 
-        let trebleField = sin(
-            (base.x * 13.0)
-                + (base.y * 11.0)
-                + (base.z * 9.0)
-                + (time * 1.52)
-        )
-        let deformationGain = 0.60 + (state.energy * 0.65)
-        let surfaceGain = 0.82 + (state.surfaceDisplacement * 0.28)
-        let lowMidDrive = (state.lowMids * 0.34) + (response.lowMids * 0.66)
+        let trebleField = (
+            sin(
+                (base.x * 13.0)
+                    + (base.y * 11.0)
+                    + (base.z * 9.0)
+                    + (time * 1.52)
+            )
+                + sin(
+                    (-base.x * 17.0)
+                        + (base.y * 14.0)
+                        - (base.z * 12.0)
+                        - (time * 1.21)
+                )
+        ) * 0.5
+        let responsiveLowMids = perceptualResponse(state.lowMids)
+        let responsiveMids = perceptualResponse(state.mids)
+        let responsiveTreble = perceptualResponse(state.treble)
+        let responsiveEnergy = perceptualResponse(state.energy)
+        let responsiveSurface = perceptualResponse(state.surfaceDisplacement)
+        let responsiveBeat = perceptualResponse(state.beatPulse)
+        let deformationGain = 0.65 + (responsiveEnergy * 0.75)
+        let surfaceGain = 0.84 + (responsiveSurface * 0.30)
+        let lowMidDrive = (responsiveLowMids * 0.32) + (response.lowMids * 0.68)
         let lowMidWaves = lowMidField
             * lowMidDrive
             * lowMidWaveStrength
             * deformationGain
             * surfaceGain
         let localizedMids = midField
-            * state.mids
+            * responsiveMids
             * midDeformationStrength
             * deformationGain
+        let dynamicPeaks = dynamicPeakField
+            * ((responsiveMids * 0.72) + (responsiveBeat * 0.28))
+            * dynamicPeakStrength
+            * deformationGain
         let trebleDetail = trebleField
-            * state.treble
+            * responsiveTreble
             * trebleDetailStrength
             * deformationGain
         let beatImpulse = response.beat * beatImpulseStrength
+        let beatPeaks = dynamicPeakField * response.beat * beatPeakStrength
+        let beatDistance = 1 - SphereMath.clamp(
+            simd_dot(base, firstPeakCenter),
+            lowerBound: -1,
+            upperBound: 1
+        )
+        let beatWave = sin((beatDistance * 12.5) - (time * 5.4))
+            * exp(-beatDistance * 1.8)
+            * response.beat
+            * beatWaveStrength
 
         let radialOffset = idleBreathing
             + idleTravelingWave
             + idleMigratingLobe
+            + idlePeaks
             + bassBreathing
             + lowMidWaves
             + localizedMids
+            + dynamicPeaks
             + trebleDetail
             + beatImpulse
+            + beatPeaks
+            + beatWave
         let radius = SphereMath.clamp(
             1 + radialOffset,
             lowerBound: minimumRadius,
@@ -240,5 +329,25 @@ enum SphereMotion {
         )
 
         return base * radius
+    }
+
+    private static func peakValleyField(
+        _ vertex: SIMD3<Float>,
+        center: SIMD3<Float>
+    ) -> Float {
+        let alignment = SphereMath.clamp(
+            simd_dot(vertex, center),
+            lowerBound: -1,
+            upperBound: 1
+        )
+        let core = pow(
+            SphereMath.clamp((alignment - 0.86) / 0.14),
+            1.65
+        )
+        let shoulder = pow(
+            SphereMath.clamp((alignment - 0.48) / 0.52),
+            1.20
+        )
+        return (core * 1.75) - (shoulder * 0.55)
     }
 }
